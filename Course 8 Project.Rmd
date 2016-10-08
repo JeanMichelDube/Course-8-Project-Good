@@ -1,0 +1,130 @@
+---
+title: "Practical Machine Learning Course Project"
+author: "Jean-Michel Dubé"
+date: "October 2016"
+output: html_document
+---
+# Background
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+# Data
+
+The training data for this project are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+# What you should submit
+
+The goal of your project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. You may use any of the other variables to predict with. You should create a report describing how you built your model, how you used cross validation, what you think the expected out of sample error is, and why you made the choices you did. You will also use your prediction model to predict 20 different test cases.
+
+# Preliminary work
+
+## Reproducibility
+
+In order for this piece to be reproducible, we have to assign a seed value. We will use seed 666. We will use the caret, rpart, random forest, gbm and rattle packages during the analysis.
+
+## Data
+
+Here is a description of the data set :
+
+Six young health participants were asked to perform one set of 10 repetitions of the Unilateral Dumbbell Biceps Curl in five different fashions: exactly according to the specification (Class A), throwing the elbows to the front (Class B), lifting the dumbbell only halfway (Class C), lowering the dumbbell only halfway (Class D) and throwing the hips to the front (Class E). Class A corresponds to the specified execution of the exercise, while the other 4 classes correspond to common mistakes.
+
+Based on the data collected we will build a model aiming to predict the class within the data set. We will then test our model against new data to test its accuracy.
+
+## Building the model
+
+In order to build the model, we will try three different approaches. The most accurate approach will be chosen to predict the classe from the pml-testing file.
+
+## Cross-validation
+
+To compare accuracy between our models, we will split the data in half. One half will be the training data and the second half will be the test data. Testing our four models on data that was not used in the model building process should produce a valid outcome.
+
+# Code
+
+## Installing packages and setting the seed
+
+```{r warning =FALSE, message=FALSE}
+#set seed to 666
+set.seed(666)
+#install packages.
+library(caret)
+library(rpart)
+library(randomForest)
+library(rattle)
+library(gbm)
+```
+
+## Download and organize data
+
+```{r warning =FALSE, message=FALSE}
+#Download data to working directory and load it to R. Replace empty cells and error cells by NA value.
+DataForModel <- read.csv("pml-training.csv", na.strings=c("NA","#DIV/0!", ""))
+DataForTest <- read.csv("pml-testing.csv", na.strings=c("NA","#DIV/0!", ""))
+```
+
+We notice that some columns have large amounts of N/A values. We will remove these columns from the data frames. Columns 1 to 7 do not provide data related to the exercise. We will remove these columns as well.
+
+```{r warning =FALSE, message=FALSE}
+#remove N/A values
+DataForModel<-DataForModel[,colSums(is.na(DataForModel)) == 0]
+DataForTest<-DataForTest[,colSums(is.na(DataForTest)) == 0]
+#remove columns 1-7
+DataForModel<-DataForModel[,-c(1:7)]
+DataForTest<-DataForTest[,-c(1:7)]
+```
+
+## Create cross-validation sample
+
+```{r warning =FALSE, message=FALSE}
+subsamples <- createDataPartition(y=DataForModel$classe, p=0.5, list=FALSE)
+subTraining <- DataForModel[subsamples, ] 
+subTesting <- DataForModel[-subsamples, ]
+```
+
+## Train 3 models
+
+We have chosen 3 models we learned during the course : decision tree, random forest and boosted trees.
+
+```{r warning =FALSE, message=FALSE, results="hide"}
+modelRpart<-train(classe ~ ., data=subTraining, method="rpart")
+pred_Rpart <- predict(modelRpart, subTesting)
+modelRandomForest<-train(classe ~ ., data=subTraining, method="rf")
+pred_RandomForest <- predict(modelRandomForest, subTesting)
+modelGBM<-train(classe ~ ., data=subTraining, method="gbm")
+pred_GBM <- predict(modelGBM, subTesting)
+```
+
+## Compare accuracy
+
+```{r warning =FALSE}
+# Accuracy using decision tree
+confusionMatrix(pred_Rpart, subTesting$classe)$overall[1]
+# Accuracy using random forest
+confusionMatrix(pred_RandomForest, subTesting$classe)$overall[1]
+# Accuracy using boosted trees
+confusionMatrix(pred_GBM, subTesting$classe)$overall[1]
+```
+
+## Chose best model
+
+The random forest provided the best accuracy. The boosted trees method was a close second. We can see the full data here :
+
+```{r warning =FALSE}
+confusionMatrix(pred_RandomForest, subTesting$classe)
+```
+
+The accuracy was 99.02% on the test group. The out of sample error is  1 minus the accuracy, or 0.98%.
+
+## Predict test data
+
+We can now predict the values of the test data.
+
+```{r warning =FALSE}
+pred_final <- predict(modelRandomForest, DataForTest)
+pred_final
+```
